@@ -5,6 +5,27 @@ using UnityEditor;
 
 public partial class ResPacker
 {
+    private static void CheckVersion(string version)
+    {
+        int number;
+
+        // 打包需要指定客户端版本
+        if (string.IsNullOrEmpty(version))
+            Diagnostics.RaiseException("Build packet need specified client version");
+
+        // 解析版本
+        var components = version.Split('.');
+
+        // 版本格式为 'n.n.n'
+        if (components.Length != 3 ||
+            Int32.TryParse(components[0], out number) == false ||
+            Int32.TryParse(components[1], out number) == false ||
+            Int32.TryParse(components[2], out number) == false)
+        {
+            Diagnostics.RaiseException("Invalid version({0}) format.", version);
+        }
+    }
+
     private static string GetReleaseBinPath(string rootPath, string version)
     {
         // 规范根路径
@@ -17,6 +38,23 @@ public partial class ResPacker
         output = PathUtil.Combine(rootPath, GetBuildPlatformString(platform));
         output = PathUtil.Combine(output, "bin");
         output = PathUtil.Combine(output, "release_" + version.Replace('.', '_'));
+
+        // 返回路径
+        return output;
+    }
+
+    private static string GetPatchBinPath(string rootPath, string sourceVersion, string destVersion)
+    {
+        // 规范根路径
+        var output = PathUtil.Normalize(rootPath);
+
+        // 获取当前打包的目标平台
+        var platform = EditorUserBuildSettings.activeBuildTarget;
+
+        // 生成patch包的二进制文件输出路径
+        output = PathUtil.Combine(rootPath, GetBuildPlatformString(platform));
+        output = PathUtil.Combine(output, "bin");
+        output = PathUtil.Combine(output, "patch_" + sourceVersion.Replace(',', '_') + "_to_" + destVersion.Replace(',', '_'));
 
         // 返回路径
         return output;
@@ -39,6 +77,18 @@ public partial class ResPacker
         return output;
     }
 
+    private static string ComputeMd5(string path)
+    {
+        // 读取文件数据
+        var bytes = File.ReadAllBytes(path);
+
+        // 计算md5值
+        var md5 = Md5.Encode(bytes);
+
+        // 转换成可读性更好的字符串
+        return BitConverter.ToString(md5).Replace("-", "").ToLowerInvariant();
+    }
+
     private static bool IsMetaFile(string path)
     {
         return path.EndsWith(".meta");
@@ -51,6 +101,36 @@ public partial class ResPacker
             if (IsMetaFile(files[i]))
                 files.RemoveAt(i);
         }
+    }
+
+    private static string[] FindCsharpScripts()
+    {
+        // 所有的csharp文件
+        var files = new List<string>();
+
+        // 获取csharp根目录下的所有文件
+        files.AddRange(PathUtil.GetFiles(CSHARP_DIR, "*.cs", SearchOption.AllDirectories));
+
+        // 移除meta文件
+        ExcludeMetaFiles(files);
+
+        // 以数组的方式返回
+        return files.ToArray();
+    }
+
+    private static string[] FindUnityAllAssets()
+    {
+        // 存储所有的unity资源
+        var assets = new List<string>();
+
+        // 获取所有的unity资源
+        assets.AddRange(PathUtil.GetFiles(RES_DIR, "*.*", SearchOption.AllDirectories));
+
+        // 过滤meta文件
+        ExcludeMetaFiles(assets);
+
+        // 以数组的方式返回
+        return assets.ToArray();
     }
 
     private static string[] FindUnityRootAssets()
