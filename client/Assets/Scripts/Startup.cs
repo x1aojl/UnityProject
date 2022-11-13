@@ -40,6 +40,8 @@ class Startup : MonoBehaviour
 
     private void Update()
     {
+        ResourceManager.Update();
+
         // 累加gc时间
         _gcAccTime += Time.unscaledDeltaTime;
 
@@ -62,12 +64,14 @@ class Startup : MonoBehaviour
 
     private void OnAwakeImpl()
     {
-
+        ResourceManager.Init();
     }
 
     // 在此函数中处理析构相关逻辑
     private void OnDestroyImpl()
     {
+        ResourceManager.Shutdown();
+
         // 等待gc完成
         GC.Collect();
         GC.WaitForPendingFinalizers();
